@@ -1,46 +1,24 @@
 package main
 
 import (
+	"1c_cron_dump/models"
+	dump_thread "1c_cron_dump/threads"
 	"flag"
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
-	"syscall"
+	"path"
+	"strconv"
+	"sync"
+	"time"
 
 	"github.com/adhocore/gronx"
-	"github.com/danieljoos/wincred"
+	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
 
-type Infobase struct {
-	Name               string `yaml:"name"`
-	Path               string `yaml:"path"`
-	Cron               string `yaml:"cron"`
-	TTLDays            int    `yaml:"ttl_days"`
-	DumpPath           string `yaml:"dump_path"`
-	WindowsCredentials string `yaml:"windows_credentials"`
-	Binary             string `yaml:"binary"`
-}
-
-type Credentials struct {
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-}
-
-type Config struct {
-	availableBinaries map[string]string `yaml:"available_binaries"`
-	Databases         []Infobase        `yaml:"databases"`
-	LogPath           string            `yaml:"log_path"`
-	ThreadPoolSize    int               `yaml:"thread_pool_size"`
-}
-
-func garbageCollectorJob(folder string) {
-
-}
-
-func validateConfig(configUri string) (config *Config, err error) {
-	config = &Config{}
+func validateConfig(configUri string) (config *models.Config, err error) {
+	config = &models.Config{}
 	err = nil
 	content, err := os.ReadFile(configUri)
 	if err != nil {
@@ -60,6 +38,10 @@ func validateConfig(configUri string) (config *Config, err error) {
 	return
 }
 
+func getTimestamp(dat time.Time) int64 {
+	return dat.Unix()
+}
+
 func main() {
 	validateOnly := flag.Bool("validate", false, "For config validation only")
 	configPath := flag.String("path", "", "Path to config file")
@@ -76,38 +58,26 @@ func main() {
 	if *validateOnly {
 		os.Exit(0)
 	}
-	infobase := config.Databases[0]
-	isDue, err := gronx.New().IsDue(infobase.Cron)
-	if err != nil {
-		log.Fatalf("error: %v\n", err)
-		os.Exit(3)
-	}
-	if !isDue {
-		log.Fatalf("cron <%s> is not due now\n", infobase.Cron)
-		os.Exit(4)
-	}
-	cred, err := wincred.GetGenericCredential(infobase.WindowsCredentials)
-	username := cred.UserName
-	u16 := make([]uint16, len(cred.CredentialBlob)/2)
+	logs := make(chan map[string]string)
+	var wgWorker sync.WaitGroup
+	var wgLogger sync.WaitGroup
 
-	for i := range len(u16) {
-		u16[i] = uint16(cred.CredentialBlob[i*2]) |
-			uint16(cred.CredentialBlob[i*2+1])<<8
+	uuidObj, err := uuid.NewV7()
+	var id string = strconv.FormatInt(time.Now().UnixNano(), 10)
+	if err == nil {
+		id = uuidObj.String()
 	}
-	password := syscall.UTF16ToString(u16)
+	logPath := path.Join(config.DumpFolder, fmt.Sprintf("%s.log", id))
+	wgLogger.Add(1)
+	go dump_thread.LeggerThread(logs, logPath, &wgLogger)
 
-	cmdArgs := []string{
-		"DESIGNER",
-		"/F", infobase.Path,
-		"/N", username,
-		"/P", password,
-		"/DumpIB", infobase.DumpPath,
-		"/DisableStartupDialogs",
+	for i := 0; i < len(config.Databases); i++ {
+		wgWorker.Add(1)
+		go dump_thread.Worker(config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, &wgWorker)
 	}
-	_, err = exec.Command(config.availableBinaries[infobase.Binary], cmdArgs...).Output()
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-		os.Exit(3)
-	}
+
+	wgWorker.Wait()
+	close(logs)
+	wgLogger.Wait()
 	os.Exit(0)
 }

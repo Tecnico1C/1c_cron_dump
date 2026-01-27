@@ -67,7 +67,7 @@ func main() {
 	if err == nil {
 		id = uuidObj.String()
 	}
-	logPath := path.Join(config.DumpFolder, fmt.Sprintf("%s.log", id))
+	logPath := path.Join(config.LogFolder, fmt.Sprintf("%s.log", id))
 	wgLogger.Add(1)
 	go dump_thread.LeggerThread(logs, logPath, &wgLogger)
 

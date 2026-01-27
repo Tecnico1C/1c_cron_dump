@@ -2,6 +2,7 @@ package dump_thread
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -15,18 +16,25 @@ type Log struct {
 func LeggerThread(logs <-chan map[string]string, logPath string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	fileErrored := false
 	if err != nil {
-		return
+		fmt.Printf("Error in log file, exiting")
+		fileErrored = true
 	}
 	defer f.Close()
 	for log := range logs {
+		// Avoid deadlock in main
+		if fileErrored {
+			<-logs
+			continue
+		}
 		line := &Log{}
 		now := time.Now().UTC().Format(time.RFC3339)
 		line.Timestamp = now
 		line.Data = log
 		b, err := json.Marshal(line)
 		if err != nil {
-			break
+			continue
 		}
 		_, err = f.Write(append(b, '\n'))
 	}

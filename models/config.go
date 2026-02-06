@@ -16,4 +16,6 @@ type Config struct {
 	LogFolder         string            `yaml:"log_folder"`
 	ThreadPoolSize    int               `yaml:"thread_pool_size"`
 	DumpFolder        string            `yaml:"dump_folder"`
+	ConcurrencyLevel  int               `yaml:"concurrency_level"`
+	MaxAttempts       int               `yaml:"max_attemps"`
 }

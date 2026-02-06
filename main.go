@@ -71,9 +71,45 @@ func main() {
 	wgLogger.Add(1)
 	go dump_thread.LeggerThread(logs, logPath, &wgLogger)
 
+	var jobHead *models.Job = nil
+
+	// Load all jobs in a list
+	var currentHead *models.Job = nil
 	for i := 0; i < len(config.Databases); i++ {
+		if jobHead == nil {
+			jobHead = &models.Job{
+				Infobase: &config.Databases[i],
+				Next:     nil,
+			}
+			currentHead = jobHead
+			continue
+		}
+		currentHead.Next = &models.Job{
+			Infobase: &config.Databases[i],
+			Next:     nil,
+		}
+		currentHead = currentHead.Next
+	}
+
+	jobQueue := make(chan *models.Job)
+	responseQueue := make(chan *models.JobResponse)
+
+	for i := 0; i < config.ConcurrencyLevel; i++ {
 		wgWorker.Add(1)
 		go dump_thread.Worker(config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, &wgWorker)
+	}
+
+	for {
+		// TODO:
+		// If a job is not due no get the amount of seconds till it's due
+		// If a job is due now dispatch it to a thread
+		// Then
+		// select any between:
+		// a new response in pushed to chan
+		// time till next job is due expire
+		// break only when all jobs are completed
+		sleepTime := 0
+		break
 	}
 
 	wgWorker.Wait()

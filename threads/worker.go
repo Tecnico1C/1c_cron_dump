@@ -13,18 +13,6 @@ import (
 	"github.com/danieljoos/wincred"
 )
 
-type JobResponse struct {
-	Infobase *models.Infobase
-	Err      error
-	Position int
-}
-
-type JobRequest struct {
-	Position int
-	Infobase *models.Infobase
-	RetryAt  int64
-}
-
 func Worker(dumpFolder string, binaries map[string]string, infobase *models.Infobase, logs chan<- map[string]string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	retry := 0

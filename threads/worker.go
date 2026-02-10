@@ -13,11 +13,9 @@ import (
 	"github.com/danieljoos/wincred"
 )
 
-func Worker(dumpFolder string, binaries map[string]string, infobase *models.Infobase, logs chan<- map[string]string, wg *sync.WaitGroup) {
+func Worker(dumpFolder string, binaries map[string]string, jobs <-chan *models.Infobase, logs chan<- map[string]string, jobStatus chan<- models.JobStatus, wg *sync.WaitGroup) {
 	defer wg.Done()
-	retry := 0
-	limit := 10
-	for {
+	for infobase := range jobs {
 		log := make(map[string]string)
 		log["infobase"] = infobase.Name
 		log["infobase_path"] = infobase.Path
@@ -25,25 +23,31 @@ func Worker(dumpFolder string, binaries map[string]string, infobase *models.Info
 		if err != nil {
 			log["err"] = err.Error()
 			logs <- log
-			return
+			jobStatus <- &models.CompletedJob{}
+			continue
 		}
 		if !isDue {
 			nextTick, err := gronx.NextTick(infobase.Cron, true)
 			if err != nil {
 				log["err"] = err.Error()
 				logs <- log
-				return
+				jobStatus <- &models.CompletedJob{}
+				continue
 			}
 			log["message"] = fmt.Sprintf("not allowed to perform a dump at this time, will retry at: %s", nextTick.UTC().Format(time.RFC3339))
 			logs <- log
-			time.Sleep(time.Until(nextTick))
+			jobStatus <- &models.FailedJob{
+				Infobase: infobase,
+				NextTick: nextTick,
+			}
 			continue
 		}
 		cred, err := wincred.GetGenericCredential(infobase.WindowsCredentials)
 		if err != nil {
 			log["err"] = err.Error()
+			jobStatus <- &models.CompletedJob{}
 			logs <- log
-			return
+			continue
 		}
 		username := cred.UserName
 		u16 := make([]uint16, len(cred.CredentialBlob)/2)
@@ -68,29 +72,28 @@ func Worker(dumpFolder string, binaries map[string]string, infobase *models.Info
 		if !ok {
 			log["err"] = "File binary not found in config file"
 			logs <- log
-			return
+			jobStatus <- &models.CompletedJob{}
+			continue
 		}
 
 		_, err = exec.Command(binary, cmdArgs...).Output()
 		if err != nil {
-			if retry < limit {
-				log["err"] = fmt.Sprintf("There was an error: <%v> retry in 60 seconds", err)
-			} else {
+			if infobase.Retry == 0 {
 				log["err"] = fmt.Sprintf("Reached maximum number of retry, %v", err)
+				logs <- log
+				jobStatus <- &models.CompletedJob{}
+				continue
 			}
-			logs <- log
-			if retry >= limit {
-				return
+			log["err"] = fmt.Sprintf("There was an error: <%v> retry in 60 seconds", err)
+			infobase.Retry -= 1
+			jobStatus <- &models.FailedJob{
+				Infobase: infobase,
+				NextTick: time.Now().Add(1 * time.Minute),
 			}
-			retry += 1
-			time.Sleep(60 * time.Second)
 			continue
 		}
-		break
+		log["message"] = "Dump completed successfully"
+		logs <- log
+		jobStatus <- &models.CompletedJob{}
 	}
-	log := make(map[string]string)
-	log["infobase"] = infobase.Name
-	log["infobase_path"] = infobase.Path
-	log["message"] = "Dump completed successfully"
-	logs <- log
 }

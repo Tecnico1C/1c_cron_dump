@@ -17,6 +17,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type FailedJobListItem struct {
+	Job  *models.FailedJob
+	Next *FailedJobListItem
+}
+
 func validateConfig(configUri string) (config *models.Config, err error) {
 	config = &models.Config{}
 	err = nil
@@ -36,10 +41,6 @@ func validateConfig(configUri string) (config *models.Config, err error) {
 		}
 	}
 	return
-}
-
-func getTimestamp(dat time.Time) int64 {
-	return dat.Unix()
 }
 
 func main() {
@@ -71,48 +72,59 @@ func main() {
 	wgLogger.Add(1)
 	go dump_thread.LeggerThread(logs, logPath, &wgLogger)
 
-	var jobHead *models.Job = nil
+	var jobHead *FailedJobListItem = nil
 
-	// Load all jobs in a list
-	var currentHead *models.Job = nil
-	for i := 0; i < len(config.Databases); i++ {
-		if jobHead == nil {
-			jobHead = &models.Job{
-				Infobase: &config.Databases[i],
-				Next:     nil,
-			}
-			currentHead = jobHead
-			continue
-		}
-		currentHead.Next = &models.Job{
-			Infobase: &config.Databases[i],
-			Next:     nil,
-		}
-		currentHead = currentHead.Next
-	}
-
-	jobQueue := make(chan *models.Job)
-	responseQueue := make(chan *models.JobResponse)
+	jobQueue := make(chan *models.Infobase, len(config.Databases))
+	responseQueue := make(chan models.JobStatus, len(config.Databases))
 
 	for i := 0; i < config.ConcurrencyLevel; i++ {
 		wgWorker.Add(1)
-		go dump_thread.Worker(config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, &wgWorker)
+		go dump_thread.Worker(config.DumpFolder, config.AvailableBinaries, jobQueue, logs, responseQueue, &wgWorker)
 	}
 
+	for i := 0; i < len(config.Databases); i++ {
+		config.Databases[i].Retry = config.MaxAttempts
+		jobQueue <- &config.Databases[i]
+	}
+
+	remainingJobs := len(config.Databases)
+	nextTick := time.Now().Add(1 * time.Minute)
 	for {
-		// TODO:
-		// If a job is not due no get the amount of seconds till it's due
-		// If a job is due now dispatch it to a thread
-		// Then
-		// select any between:
-		// a new response in pushed to chan
-		// time till next job is due expire
-		// break only when all jobs are completed
-		sleepTime := 0
-		break
+		fmt.Printf("Inside\n")
+		select {
+		case job := <-responseQueue:
+			switch j := job.(type) {
+			case *models.CompletedJob:
+				remainingJobs -= 1
+			case *models.FailedJob:
+				jobHead = &FailedJobListItem{
+					Job:  j,
+					Next: jobHead,
+				}
+			}
+		case <-time.After(time.Until(nextTick)):
+		}
+		if remainingJobs == 0 {
+			break
+		}
+		nextTick = time.Now().Add(1 * time.Minute)
+		for link := &jobHead; *link != nil; {
+			node := *link
+			if node.Job.NextTick.After(time.Now()) {
+				link = &node.Next
+				continue
+			}
+			jobQueue <- node.Job.Infobase
+			if node.Job.NextTick.Before(nextTick) {
+				nextTick = node.Job.NextTick
+			}
+			*link = node.Next
+		}
 	}
 
+	close(jobQueue)
 	wgWorker.Wait()
+	close(responseQueue)
 	close(logs)
 	wgLogger.Wait()
 	os.Exit(0)

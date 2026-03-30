@@ -1,16 +1,15 @@
 package dump_thread
 
 import (
+	"1c_cron_dump/credentials"
 	"1c_cron_dump/models"
 	"fmt"
 	"os/exec"
 	"path"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/adhocore/gronx"
-	"github.com/danieljoos/wincred"
 )
 
 func Worker(dumpFolder string, binaries map[string]string, jobs <-chan *models.Infobase, logs chan<- map[string]string, jobStatus chan<- models.JobStatus, wg *sync.WaitGroup) {
@@ -42,7 +41,16 @@ func Worker(dumpFolder string, binaries map[string]string, jobs <-chan *models.I
 			}
 			continue
 		}
-		cred, err := wincred.GetGenericCredential(infobase.WindowsCredentials)
+
+		err, username, password := credentials.GetCredentials(infobase.WindowsCredentials)
+		if err != nil {
+			log["err"] = err.Error()
+			jobStatus <- &models.CompletedJob{}
+			logs <- log
+			continue
+		}
+
+		/*cred, err := wincred.GetGenericCredential(infobase.WindowsCredentials)
 		if err != nil {
 			log["err"] = err.Error()
 			jobStatus <- &models.CompletedJob{}
@@ -56,7 +64,7 @@ func Worker(dumpFolder string, binaries map[string]string, jobs <-chan *models.I
 			u16[i] = uint16(cred.CredentialBlob[i*2]) |
 				uint16(cred.CredentialBlob[i*2+1])<<8
 		}
-		password := syscall.UTF16ToString(u16)
+		password := syscall.UTF16ToString(u16)*/
 		dumpFullpath := path.Join(dumpFolder, fmt.Sprintf("Dump_%s_%s.dt", infobase.Name, time.Now().Format("20060102")))
 
 		cmdArgs := []string{

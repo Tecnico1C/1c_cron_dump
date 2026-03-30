@@ -59,6 +59,7 @@ func main() {
 	if *validateOnly {
 		os.Exit(0)
 	}
+
 	logs := make(chan map[string]string)
 	var wgWorker sync.WaitGroup
 	var wgLogger sync.WaitGroup
@@ -127,5 +128,6 @@ func main() {
 	close(responseQueue)
 	close(logs)
 	wgLogger.Wait()
+
 	os.Exit(0)
 }

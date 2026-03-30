@@ -59,7 +59,6 @@ func main() {
 	if *validateOnly {
 		os.Exit(0)
 	}
-
 	logs := make(chan map[string]string)
 	var wgWorker sync.WaitGroup
 	var wgLogger sync.WaitGroup
@@ -73,61 +72,13 @@ func main() {
 	wgLogger.Add(1)
 	go dump_thread.LeggerThread(logs, logPath, &wgLogger)
 
-	var jobHead *FailedJobListItem = nil
-
-	jobQueue := make(chan *models.Infobase, len(config.Databases))
-	responseQueue := make(chan models.JobStatus, len(config.Databases))
-
-	for i := 0; i < config.ConcurrencyLevel; i++ {
-		wgWorker.Add(1)
-		go dump_thread.Worker(config.DumpFolder, config.AvailableBinaries, jobQueue, logs, responseQueue, &wgWorker)
-	}
-
 	for i := 0; i < len(config.Databases); i++ {
-		config.Databases[i].Retry = config.MaxAttempts
-		jobQueue <- &config.Databases[i]
+		wgWorker.Add(1)
+		go dump_thread.Worker(config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, &wgWorker)
 	}
 
-	remainingJobs := len(config.Databases)
-	nextTick := time.Now().Add(1 * time.Minute)
-	for {
-		fmt.Printf("Inside\n")
-		select {
-		case job := <-responseQueue:
-			switch j := job.(type) {
-			case *models.CompletedJob:
-				remainingJobs -= 1
-			case *models.FailedJob:
-				jobHead = &FailedJobListItem{
-					Job:  j,
-					Next: jobHead,
-				}
-			}
-		case <-time.After(time.Until(nextTick)):
-		}
-		if remainingJobs == 0 {
-			break
-		}
-		nextTick = time.Now().Add(1 * time.Minute)
-		for link := &jobHead; *link != nil; {
-			node := *link
-			if node.Job.NextTick.After(time.Now()) {
-				link = &node.Next
-				continue
-			}
-			jobQueue <- node.Job.Infobase
-			if node.Job.NextTick.Before(nextTick) {
-				nextTick = node.Job.NextTick
-			}
-			*link = node.Next
-		}
-	}
-
-	close(jobQueue)
 	wgWorker.Wait()
-	close(responseQueue)
 	close(logs)
 	wgLogger.Wait()
-
 	os.Exit(0)
 }

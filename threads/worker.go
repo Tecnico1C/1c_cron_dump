@@ -42,7 +42,7 @@ func Worker(dumpFolder string, binaries map[string]string, jobs <-chan *models.I
 			continue
 		}
 
-		err, username, password := credentials.GetCredentials(infobase.WindowsCredentials)
+		err, username, password := credentials.GetCredentials(infobase)
 		if err != nil {
 			log["err"] = err.Error()
 			jobStatus <- &models.CompletedJob{}

@@ -1,13 +1,14 @@
 package credentials
 
 import (
+	"1c_cron_dump/models"
 	"syscall"
 
 	"github.com/danieljoos/wincred"
 )
 
-func GetCredentials(credId string) (error, string, string) {
-	cred, err := wincred.GetGenericCredential(credId)
+func GetCredentials(infobase *models.Infobase) (error, string, string) {
+	cred, err := wincred.GetGenericCredential(infobase.WindowsCredentials)
 	if err != nil {
 		return err, "", ""
 	}

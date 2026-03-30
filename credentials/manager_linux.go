@@ -1,14 +1,15 @@
 package credentials
 
 import (
+	"1c_cron_dump/models"
 	"encoding/base64"
 	"errors"
 	"os"
 	"strings"
 )
 
-func GetCredentials(credId string) (error, string, string) {
-	value, exists := os.LookupEnv(credId)
+func GetCredentials(infobase *models.Infobase) (error, string, string) {
+	value, exists := os.LookupEnv(infobase.CredentialsVariable)
 
 	if !exists {
 		return errors.New("Credential not found"), "", ""

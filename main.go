@@ -77,7 +77,7 @@ func main() {
 
 	for i := 0; i < len(config.Databases); i++ {
 		wgWorker.Add(1)
-		go dump_thread.Worker(config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, &wgWorker, &sharedLock)
+		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, &wgWorker, &sharedLock)
 	}
 
 	wgWorker.Wait()

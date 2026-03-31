@@ -104,10 +104,10 @@ func RunJob(dumpFolder string, binaries map[string]string, infobase *models.Info
 	}
 }
 
-func Worker(dumpFolder string, binaries map[string]string, infobase *models.Infobase, logs chan<- map[string]string, wg *sync.WaitGroup, sharedLock *models.SharedLock) {
+func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, infobase *models.Infobase, logs chan<- map[string]string, wg *sync.WaitGroup, sharedLock *models.SharedLock) {
 	defer wg.Done()
 	retry := 0
-	limit := 10
+	limit := maxAttempts
 	for {
 		log := make(map[string]string)
 		log["infobase"] = infobase.Name

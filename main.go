@@ -17,11 +17,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type FailedJobListItem struct {
-	Job  *models.FailedJob
-	Next *FailedJobListItem
-}
-
 func validateConfig(configUri string) (config *models.Config, err error) {
 	config = &models.Config{}
 	err = nil
@@ -59,7 +54,15 @@ func main() {
 	if *validateOnly {
 		os.Exit(0)
 	}
+
+	var jobs []*models.Infobase = make([]*models.Infobase, len(config.Databases))
+
+	for i := 0; i < len(config.Databases); i++ {
+		jobs[i] = &config.Databases[i]
+	}
+
 	logs := make(chan map[string]string)
+	sharedLock := models.NewSharedLock(config.ConcurrencyLevel)
 	var wgWorker sync.WaitGroup
 	var wgLogger sync.WaitGroup
 
@@ -74,7 +77,7 @@ func main() {
 
 	for i := 0; i < len(config.Databases); i++ {
 		wgWorker.Add(1)
-		go dump_thread.Worker(config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, &wgWorker)
+		go dump_thread.Worker(config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, &wgWorker, &sharedLock)
 	}
 
 	wgWorker.Wait()

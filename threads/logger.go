@@ -1,6 +1,7 @@
 package dump_thread
 
 import (
+	"1c_cron_dump/models"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,23 @@ import (
 type Log struct {
 	Timestamp string            `json:"timestmp"`
 	Data      map[string]string `json:"data"`
+}
+
+func LogInfo(infobase *models.Infobase, text string) map[string]string {
+	log := make(map[string]string)
+	log["infobase"] = infobase.Name
+	log["infobase_path"] = infobase.Path
+	log["text"] = text
+	return log
+}
+
+func LogError(infobase *models.Infobase, text string, err error) map[string]string {
+	log := make(map[string]string)
+	log["infobase"] = infobase.Name
+	log["infobase_path"] = infobase.Path
+	log["text"] = text
+	log["error"] = err.Error()
+	return log
 }
 
 func LeggerThread(logs <-chan map[string]string, logPath string, wg *sync.WaitGroup) {

@@ -62,9 +62,11 @@ func main() {
 	}
 
 	logs := make(chan map[string]string)
-	sharedLock := models.NewSharedLock(config.ConcurrencyLevel)
+	uploadJobs := make(chan models.DriveObject)
+	sharedLock := models.NewSharedLock(config.DumpConcurrencyLevel)
 	var wgWorker sync.WaitGroup
 	var wgLogger sync.WaitGroup
+	var wgUploader sync.WaitGroup
 
 	uuidObj, err := uuid.NewV7()
 	var id string = strconv.FormatInt(time.Now().UnixNano(), 10)
@@ -77,10 +79,18 @@ func main() {
 
 	for i := 0; i < len(config.Databases); i++ {
 		wgWorker.Add(1)
-		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, &wgWorker, &sharedLock)
+		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, uploadJobs, &wgWorker, &sharedLock)
+	}
+
+	for i := 0; i < config.UploadConcurrencyLevel; i++ {
+		fmt.Printf("Join")
+		wgUploader.Add(1)
+		go dump_thread.DriveUploaderWorker(uploadJobs, logs, &wgUploader)
 	}
 
 	wgWorker.Wait()
+	close(uploadJobs)
+	wgUploader.Wait()
 	close(logs)
 	wgLogger.Wait()
 	os.Exit(0)

@@ -83,7 +83,6 @@ func main() {
 	}
 
 	for i := 0; i < config.UploadConcurrencyLevel; i++ {
-		fmt.Printf("Join")
 		wgUploader.Add(1)
 		go dump_thread.DriveUploaderWorker(uploadJobs, logs, &wgUploader)
 	}

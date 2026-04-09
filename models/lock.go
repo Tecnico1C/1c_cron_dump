@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -25,7 +24,6 @@ func NewSharedLock(concurrencyLevel int) SharedLock {
 func (sl *SharedLock) CanStart() bool {
 	sl.lock.Lock()
 	defer sl.lock.Unlock()
-	fmt.Print("Lock")
 	if sl.counter == sl.limit {
 		return false
 	}
@@ -36,6 +34,5 @@ func (sl *SharedLock) CanStart() bool {
 func (sl *SharedLock) WorkDone() {
 	sl.lock.Lock()
 	defer sl.lock.Unlock()
-	fmt.Printf("Unlock")
 	sl.counter -= 1
 }

@@ -3,6 +3,7 @@ package dump_thread
 import (
 	"1c_cron_dump/credentials"
 	"1c_cron_dump/models"
+	"1c_cron_dump/utils"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -116,7 +117,13 @@ func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, info
 	retry := 0
 	limit := maxAttempts
 
-	fileName := fmt.Sprintf("Dump_%s_%s.dt", infobase.Name, time.Now().Format("20060102"))
+	id, err := utils.RandomHex(12)
+	if err != nil {
+		logs <- LogError(infobase, "Unable to generate random id", err)
+		return
+	}
+
+	fileName := fmt.Sprintf("Dump_%s_%s_%s.dt", infobase.Name, time.Now().Format("20060102"), id)
 	filePath := path.Join(dumpFolder, fileName)
 
 	for {

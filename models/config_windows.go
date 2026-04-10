@@ -9,4 +9,5 @@ type Infobase struct {
 	Binary                 string `yaml:"binary"`
 	DriveFolderId          string `yaml:"drive_folder_id"`
 	ServiceAccountFilePath string `yaml:"service_account_file_path"`
+	TTLDays                int    `yaml:"ttl_days"`
 }

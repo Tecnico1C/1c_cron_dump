@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -15,6 +16,12 @@ import (
 	"github.com/adhocore/gronx"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	Version = "dev"
+	Commit  = "none"
+	Date    = "unknown"
 )
 
 func validateConfig(configUri string) (config *models.Config, err error) {
@@ -39,22 +46,45 @@ func validateConfig(configUri string) (config *models.Config, err error) {
 }
 
 func main() {
+
+	version := flag.Bool("version", false, "Software version")
+	commit := flag.Bool("commit", false, "Software commit")
+	date := flag.Bool("date", false, "Software version date")
+	if *version || *commit || *date {
+		fmt.Printf("Version: %s\nCommit: %s\nDate: %s\n", Version, Commit, Date)
+		os.Exit(0)
+	}
+
 	validateOnly := flag.Bool("validate", false, "For config validation only")
 	configPath := flag.String("path", "", "Path to config file")
+	modeFlag := flag.String("mode", "dump", "Run in mode: <dump|clear>")
 	flag.Parse()
 	if *configPath == "" {
 		log.Fatalf("Config path is empty")
-		os.Exit(4)
+	}
+	if *modeFlag != "dump" && *modeFlag != "clear" {
+		log.Fatalf("Mode %s not recognized", *modeFlag)
 	}
 	config, err := validateConfig(*configPath)
 	if err != nil {
 		log.Fatalf("Config error: %v\n", err)
-		os.Exit(5)
 	}
 	if *validateOnly {
 		os.Exit(0)
 	}
 
+	if *modeFlag == "dump" {
+		DumpMode(config)
+	}
+
+	if *modeFlag == "clear" {
+		ClearMode(config)
+	}
+
+	os.Exit(0)
+}
+
+func DumpMode(config *models.Config) {
 	var jobs []*models.Infobase = make([]*models.Infobase, len(config.Databases))
 
 	for i := 0; i < len(config.Databases); i++ {
@@ -93,4 +123,61 @@ func main() {
 	close(logs)
 	wgLogger.Wait()
 	os.Exit(0)
+}
+
+func ClearMode(config *models.Config) {
+	databaseMap := make(map[string]*models.Infobase)
+	for i := 0; i < len(config.Databases); i++ {
+		databaseMap[config.Databases[i].Name] = &config.Databases[i]
+	}
+
+	regexpDumpFile := regexp.MustCompile(`^Dump_(?P<infobase_name>[a-zA-Z0-9_]+)_(?P<creation_date>[0-9]{8})_[a-f0-9]{24}.dt$`)
+
+	entries, err := os.ReadDir(config.DumpFolder)
+	if err != nil {
+		log.Fatalf("Unable to read folder %s", config.DumpFolder)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		fileName := entry.Name()
+
+		match := regexpDumpFile.FindStringSubmatch(fileName)
+		if match == nil {
+			continue
+		}
+		params := regexpDumpFile.SubexpNames()
+
+		result := make(map[string]string)
+		for i, name := range params {
+			if i != 0 && name != "" {
+				result[name] = match[i]
+			}
+		}
+
+		infobaseName := result["infobase_name"]
+		infobase, ok := databaseMap[infobaseName]
+		if !ok {
+			continue
+		}
+
+		creationDate, err := time.Parse("20060102", result["creation_date"])
+		if err != nil {
+			continue
+		}
+
+		diff := time.Since(creationDate)
+		if diff > time.Duration(infobase.TTLDays) {
+			continue
+		}
+
+		err = os.Remove(path.Join(config.DumpFolder, entry.Name()))
+		if err != nil {
+			continue
+		}
+
+	}
 }

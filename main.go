@@ -50,15 +50,15 @@ func main() {
 	version := flag.Bool("version", false, "Software version")
 	commit := flag.Bool("commit", false, "Software commit")
 	date := flag.Bool("date", false, "Software version date")
-	if *version || *commit || *date {
-		fmt.Printf("Version: %s\nCommit: %s\nDate: %s\n", Version, Commit, Date)
-		os.Exit(0)
-	}
-
 	validateOnly := flag.Bool("validate", false, "For config validation only")
-	configPath := flag.String("path", "", "Path to config file")
+	configPath := flag.String("config", "", "Path to config file")
 	modeFlag := flag.String("mode", "dump", "Run in mode: <dump|clear>")
 	flag.Parse()
+
+	if *version || *commit || *date {
+		fmt.Printf("Version: %s\nCommit: %s\nDate: %s", Version, Commit, Date)
+		os.Exit(0)
+	}
 	if *configPath == "" {
 		log.Fatalf("Config path is empty")
 	}
@@ -131,7 +131,7 @@ func ClearMode(config *models.Config) {
 		databaseMap[config.Databases[i].Name] = &config.Databases[i]
 	}
 
-	regexpDumpFile := regexp.MustCompile(`^Dump_(?P<infobase_name>[a-zA-Z0-9_]+)_(?P<creation_date>[0-9]{8})_[a-f0-9]{24}.dt$`)
+	regexpDumpFile := regexp.MustCompile(`^Dump_(?P<infobase_name>[a-zA-Z0-9_]+)_(?P<creation_date>[0-9]{8})_[0-9]{13}_[a-f0-9]{8}.dt$`)
 
 	entries, err := os.ReadDir(config.DumpFolder)
 	if err != nil {

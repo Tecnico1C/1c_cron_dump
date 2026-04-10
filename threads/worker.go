@@ -117,13 +117,14 @@ func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, info
 	retry := 0
 	limit := maxAttempts
 
-	id, err := utils.RandomHex(12)
+	ts := time.Now().UTC().UnixMilli()
+	id, err := utils.RandomHex(4)
 	if err != nil {
 		logs <- LogError(infobase, "Unable to generate random id", err)
 		return
 	}
 
-	fileName := fmt.Sprintf("Dump_%s_%s_%s.dt", infobase.Name, time.Now().Format("20060102"), id)
+	fileName := fmt.Sprintf("Dump_%s_%s_%013d_%s.dt", infobase.Name, time.Now().Format("20060102"), ts, id)
 	filePath := path.Join(dumpFolder, fileName)
 
 	for {

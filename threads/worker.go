@@ -66,7 +66,7 @@ type JobStatus struct {
 }
 
 func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.Infobase, connectionString *models.ConnectionString, logs chan<- map[string]string, wg *sync.WaitGroup) JobStatus {
-	err, username, password := infobase.GetCredentials()
+	username, password, err := infobase.GetCredentials()
 	if err != nil {
 		logs <- LogError(infobase, "Unable to load infobase credentials", err)
 		return JobStatus{
@@ -76,7 +76,7 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.In
 		}
 	}
 
-	err, flag, path := connectionString.Get()
+	flag, path, err := connectionString.Get()
 	if err != nil {
 		logs <- LogError(infobase, "Unable to load connection string data", err)
 		return JobStatus{
@@ -170,6 +170,7 @@ func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, info
 		if retry < limit {
 			retry += 1
 			logs <- LogError(infobase, "There was an error, retry...", fmt.Errorf("There was an error: <%v> retry in 60 seconds", jobStatus.err))
+			time.Sleep(60 * time.Second)
 			continue
 		} else {
 			logs <- LogError(infobase, "Reached maximum number of retry", jobStatus.err)

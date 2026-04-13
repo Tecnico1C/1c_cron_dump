@@ -18,60 +18,44 @@ type Infobase struct {
 	TTLDays                int    `yaml:"ttl_days"`
 }
 
-func (ib *Infobase) GetCredentials() (error, string, string) {
+func (ib *Infobase) GetCredentials() (string, string, error) {
 	value, exists := os.LookupEnv(ib.LinuxCredentials)
 
 	if !exists {
-		return errors.New("Credential not found"), "", ""
+		return "", "", errors.New("Credential not found")
 	}
 
 	parts := strings.Split(value, ";")
 	if len(parts) != 2 {
-		return errors.New("Malformed credential string"), "", ""
+		return "", "", errors.New("Malformed credential string")
 	}
 
 	decodedUsername, err := base64.StdEncoding.DecodeString(parts[0])
 	if err != nil {
-		return err, "", ""
+		return "", "", err
 	}
 
 	decodedPassword, err := base64.StdEncoding.DecodeString(parts[1])
 	if err != nil {
-		return err, "", ""
+		return "", "", err
 	}
 
-	return nil, string(decodedUsername), string(decodedPassword)
+	return string(decodedUsername), string(decodedPassword), nil
 }
 
 type ConnectionString struct {
-	Database         string `yaml:"database"`
-	Path             string `yaml:"path,omitempty"`
-	Ref              string `yaml:"ref,omitempty"`
-	Server           string `yaml:"server,omitempty"`
-	LinuxCredentials string `yaml:"linux_credentials,omitempty"`
+	Database string `yaml:"database"`
+	Path     string `yaml:"path,omitempty"`
+	Server   string `yaml:"server,omitempty"`
 }
 
-func (cs *ConnectionString) Get() (error, string, string) {
-	value, exists := os.LookupEnv(cs.LinuxCredentials)
-
-	if !exists {
-		return errors.New("Credential not found"), "", ""
+func (cs *ConnectionString) Get() (string, string, error) {
+	if cs.Path != "" {
+		return "/F", cs.Path, nil
+	}
+	if cs.Server != "" {
+		return "/S", cs.Server, nil
 	}
 
-	parts := strings.Split(value, ";")
-	if len(parts) != 2 {
-		return errors.New("Malformed credential string"), "", ""
-	}
-
-	decodedUsername, err := base64.StdEncoding.DecodeString(parts[0])
-	if err != nil {
-		return err, "", ""
-	}
-
-	decodedPassword, err := base64.StdEncoding.DecodeString(parts[1])
-	if err != nil {
-		return err, "", ""
-	}
-
-	return nil, string(decodedUsername), string(decodedPassword)
+	return "", "", errors.New("Missing <path> or <server> ?")
 }

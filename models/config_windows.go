@@ -1,7 +1,7 @@
 package models
 
 import (
-	"fmt"
+	"errors"
 	"syscall"
 
 	"github.com/danieljoos/wincred"
@@ -19,10 +19,10 @@ type Infobase struct {
 	DatabaseMode           string `yaml:"database_mode"`
 }
 
-func (ib *Infobase) GetCredentials() (error, string, string) {
+func (ib *Infobase) GetCredentials() (string, string, error) {
 	cred, err := wincred.GetGenericCredential(ib.WindowsCredentials)
 	if err != nil {
-		return err, "", ""
+		return "", "", err
 	}
 	username := cred.UserName
 	u16 := make([]uint16, len(cred.CredentialBlob)/2)
@@ -33,33 +33,21 @@ func (ib *Infobase) GetCredentials() (error, string, string) {
 	}
 	password := syscall.UTF16ToString(u16)
 
-	return nil, username, password
+	return username, password, err
 }
 
 type ConnectionString struct {
-	Database           string `yaml:"database"`
-	Path               string `yaml:"path,omitempty"`
-	Ref                string `yaml:"ref,omitempty"`
-	Server             string `yaml:"server,omitempty"`
-	WindowsCredentials string `yaml:"windows_credentials,omitempty"`
+	Database string `yaml:"database"`
+	Path     string `yaml:"path,omitempty"`
+	Server   string `yaml:"server,omitempty"`
 }
 
-func (cs *ConnectionString) Get() (error, string, string) {
+func (cs *ConnectionString) Get() (string, string, error) {
 	if cs.Path != "" {
-		return nil, "/F", cs.Path
+		return "/F", cs.Path, nil
 	}
-	cred, err := wincred.GetGenericCredential(cs.WindowsCredentials)
-	if err != nil {
-		return err, "", ""
+	if cs.Server != "" {
+		return "/S", cs.Server, nil
 	}
-	username := cred.UserName
-	u16 := make([]uint16, len(cred.CredentialBlob)/2)
-
-	for i := range len(u16) {
-		u16[i] = uint16(cred.CredentialBlob[i*2]) |
-			uint16(cred.CredentialBlob[i*2+1])<<8
-	}
-	password := syscall.UTF16ToString(u16)
-
-	return nil, "/S", fmt.Sprintf("Srvr=%s;Ref=%s;Usr=%s;Pwd=%s", cs.Server, cs.Ref, username, password)
+	return "", "", errors.New("Missing <path> or <server> ?")
 }

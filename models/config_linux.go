@@ -11,7 +11,7 @@ type Infobase struct {
 	Name                   string `yaml:"name"`
 	Cron                   string `yaml:"cron"`
 	DumpPath               string `yaml:"dump_path"`
-	LinuxCredentials       string `yaml:"credentials_variable"`
+	LinuxCredentials       string `yaml:"linux_credentials"`
 	Binary                 string `yaml:"binary"`
 	DriveFolderId          string `yaml:"drive_folder_id"`
 	ServiceAccountFilePath string `yaml:"service_account_file_path"`
@@ -48,7 +48,7 @@ type ConnectionString struct {
 	Path             string `yaml:"path,omitempty"`
 	Ref              string `yaml:"ref,omitempty"`
 	Server           string `yaml:"server,omitempty"`
-	LinuxCredentials string `yaml:"credentials,omitempty"`
+	LinuxCredentials string `yaml:"linux_credentials,omitempty"`
 }
 
 func (cs *ConnectionString) Get() (error, string, string) {

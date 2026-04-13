@@ -41,7 +41,7 @@ type ConnectionString struct {
 	Path               string `yaml:"path,omitempty"`
 	Ref                string `yaml:"ref,omitempty"`
 	Server             string `yaml:"server,omitempty"`
-	WindowsCredentials string `yaml:"credentials,omitempty"`
+	WindowsCredentials string `yaml:"windows_credentials,omitempty"`
 }
 
 func (cs *ConnectionString) Get() (error, string, string) {
@@ -61,5 +61,5 @@ func (cs *ConnectionString) Get() (error, string, string) {
 	}
 	password := syscall.UTF16ToString(u16)
 
-	return nil, "/S", fmt.Sprintf("Srv=%s;Ref=%s;Usr=%s;Pwd=%s", cs.Server, cs.Ref, username, password)
+	return nil, "/S", fmt.Sprintf("Srvr=%s;Ref=%s;Usr=%s;Pwd=%s", cs.Server, cs.Ref, username, password)
 }

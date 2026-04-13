@@ -93,7 +93,7 @@ func DumpMode(config *models.Config) {
 
 	logs := make(chan map[string]string)
 	uploadJobs := make(chan models.DriveObject)
-	sharedLock := models.NewSharedLock(config.DumpConcurrencyLevel)
+	concurrentJobs := make(chan struct{}, config.DumpConcurrencyLevel)
 	var wgWorker sync.WaitGroup
 	var wgLogger sync.WaitGroup
 	var wgUploader sync.WaitGroup
@@ -109,7 +109,7 @@ func DumpMode(config *models.Config) {
 
 	for i := 0; i < len(config.Databases); i++ {
 		wgWorker.Add(1)
-		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, uploadJobs, &wgWorker, &sharedLock)
+		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, uploadJobs, &wgWorker, concurrentJobs)
 	}
 
 	for i := 0; i < config.UploadConcurrencyLevel; i++ {

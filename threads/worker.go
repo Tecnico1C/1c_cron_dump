@@ -112,7 +112,7 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.In
 	}
 }
 
-func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, infobase *models.Infobase, logs chan<- map[string]string, uploadJobs chan<- models.DriveObject, wg *sync.WaitGroup, sharedLock *models.SharedLock) {
+func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, infobase *models.Infobase, logs chan<- map[string]string, uploadJobs chan<- models.DriveObject, wg *sync.WaitGroup, concurrentJobs chan struct{}) {
 	defer wg.Done()
 	retry := 0
 	limit := maxAttempts
@@ -128,7 +128,6 @@ func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, info
 	filePath := path.Join(dumpFolder, fileName)
 
 	for {
-
 		dueTime := CalculateDueTime(logs, infobase)
 		if dueTime.err != nil {
 			if dueTime.errorIsFatal {
@@ -145,24 +144,20 @@ func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, info
 
 		// IT'S DUE TIME
 
-		if !sharedLock.CanStart() {
-			time.Sleep(20 * time.Second)
-			continue
-		}
-
+		// Enter critical region
+		concurrentJobs <- struct{}{}
 		jobStatus := RunJob(filePath, binaries, infobase, logs, wg)
+		<-concurrentJobs
+		// Exit critical region
 
 		if jobStatus.isCompleted {
-			sharedLock.WorkDone()
 			break
 		}
 
 		if jobStatus.err != nil && jobStatus.errIsFatal {
-			sharedLock.WorkDone()
 			return
 		}
 
-		sharedLock.WorkDone()
 		if retry < limit {
 			retry += 1
 			logs <- LogError(infobase, "There was an error, retry...", fmt.Errorf("There was an error: <%v> retry in 60 seconds", jobStatus.err))

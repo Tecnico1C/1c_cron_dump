@@ -17,7 +17,6 @@ type Log struct {
 func LogInfo(infobase *models.Infobase, text string) map[string]string {
 	log := make(map[string]string)
 	log["infobase"] = infobase.Name
-	log["infobase_path"] = infobase.Path
 	log["text"] = text
 	return log
 }
@@ -25,7 +24,6 @@ func LogInfo(infobase *models.Infobase, text string) map[string]string {
 func LogError(infobase *models.Infobase, text string, err error) map[string]string {
 	log := make(map[string]string)
 	log["infobase"] = infobase.Name
-	log["infobase_path"] = infobase.Path
 	log["text"] = text
 	log["error"] = err.Error()
 	return log

@@ -42,6 +42,22 @@ func validateConfig(configUri string) (config *models.Config, err error) {
 			return
 		}
 	}
+	var connStrings map[string]models.ConnectionString = make(map[string]models.ConnectionString)
+	for i := 0; i < len(config.ConnectionStrings); i++ {
+		_, ok := connStrings[config.ConnectionStrings[i].Database]
+		if ok {
+			err = fmt.Errorf("Duplicate value found for <%s>", config.ConnectionStrings[i].Database)
+			return
+		}
+		connStrings[config.ConnectionStrings[i].Database] = config.ConnectionStrings[i]
+	}
+	for i := 0; i < len(config.Databases); i++ {
+		_, ok := connStrings[config.Databases[i].Name]
+		if !ok {
+			err = fmt.Errorf("Unable to found a connection string for database <%s>", config.Databases[i].Name)
+			return
+		}
+	}
 	return
 }
 
@@ -85,10 +101,15 @@ func main() {
 }
 
 func DumpMode(config *models.Config) {
-	var jobs []*models.Infobase = make([]*models.Infobase, len(config.Databases))
 
-	for i := 0; i < len(config.Databases); i++ {
-		jobs[i] = &config.Databases[i]
+	connectionMap := make(map[string]*models.ConnectionString)
+
+	for i := 0; i < len(config.ConnectionStrings); i++ {
+		_, ok := connectionMap[config.ConnectionStrings[i].Database]
+		if ok {
+			log.Fatalf("Duplicate connection string for <%s>", config.ConnectionStrings[i].Database)
+		}
+		connectionMap[config.ConnectionStrings[i].Database] = &config.ConnectionStrings[i]
 	}
 
 	logs := make(chan map[string]string)
@@ -109,7 +130,7 @@ func DumpMode(config *models.Config) {
 
 	for i := 0; i < len(config.Databases); i++ {
 		wgWorker.Add(1)
-		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, uploadJobs, &wgWorker, concurrentJobs)
+		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Databases[i], connectionMap[config.Databases[i].Name], logs, uploadJobs, &wgWorker, concurrentJobs)
 	}
 
 	for i := 0; i < config.UploadConcurrencyLevel; i++ {

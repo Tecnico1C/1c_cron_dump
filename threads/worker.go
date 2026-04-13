@@ -1,7 +1,6 @@
 package dump_thread
 
 import (
-	"1c_cron_dump/credentials"
 	"1c_cron_dump/models"
 	"1c_cron_dump/utils"
 	"errors"
@@ -66,8 +65,8 @@ type JobStatus struct {
 	errIsFatal  bool
 }
 
-func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.Infobase, logs chan<- map[string]string, wg *sync.WaitGroup) JobStatus {
-	err, username, password := credentials.GetCredentials(infobase)
+func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.Infobase, connectionString *models.ConnectionString, logs chan<- map[string]string, wg *sync.WaitGroup) JobStatus {
+	err, username, password := infobase.GetCredentials()
 	if err != nil {
 		logs <- LogError(infobase, "Unable to load infobase credentials", err)
 		return JobStatus{
@@ -77,9 +76,19 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.In
 		}
 	}
 
+	err, flag, path := connectionString.Get()
+	if err != nil {
+		logs <- LogError(infobase, "Unable to load connection string data", err)
+		return JobStatus{
+			isCompleted: false,
+			err:         err,
+			errIsFatal:  true,
+		}
+	}
+
 	cmdArgs := []string{
 		"DESIGNER",
-		"/F", infobase.Path,
+		flag, path,
 		"/N", username,
 		"/P", password,
 		"/DumpIB", dumpFilePath,
@@ -112,7 +121,7 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.In
 	}
 }
 
-func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, infobase *models.Infobase, logs chan<- map[string]string, uploadJobs chan<- models.DriveObject, wg *sync.WaitGroup, concurrentJobs chan struct{}) {
+func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, infobase *models.Infobase, connectionString *models.ConnectionString, logs chan<- map[string]string, uploadJobs chan<- models.DriveObject, wg *sync.WaitGroup, concurrentJobs chan struct{}) {
 	defer wg.Done()
 	retry := 0
 	limit := maxAttempts
@@ -146,7 +155,7 @@ func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, info
 
 		// Enter critical region
 		concurrentJobs <- struct{}{}
-		jobStatus := RunJob(filePath, binaries, infobase, logs, wg)
+		jobStatus := RunJob(filePath, binaries, infobase, connectionString, logs, wg)
 		<-concurrentJobs
 		// Exit critical region
 

@@ -167,7 +167,7 @@ func (db *Database) GetCommand(binary string, dumpFullPath string) (*exec.Cmd, e
 	}
 
 	cmd := exec.Command(binary, args...)
-	cmd.Env = append(cmd.Env,
+	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("PGPASSWORD=%s", password),
 	)
 

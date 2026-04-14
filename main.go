@@ -42,22 +42,6 @@ func validateConfig(configUri string) (config *models.Config, err error) {
 			return
 		}
 	}
-	var connStrings map[string]models.ConnectionString = make(map[string]models.ConnectionString)
-	for i := 0; i < len(config.ConnectionStrings); i++ {
-		_, ok := connStrings[config.ConnectionStrings[i].Database]
-		if ok {
-			err = fmt.Errorf("Duplicate value found for <%s>", config.ConnectionStrings[i].Database)
-			return
-		}
-		connStrings[config.ConnectionStrings[i].Database] = config.ConnectionStrings[i]
-	}
-	for i := 0; i < len(config.Databases); i++ {
-		_, ok := connStrings[config.Databases[i].Name]
-		if !ok {
-			err = fmt.Errorf("Unable to found a connection string for database <%s>", config.Databases[i].Name)
-			return
-		}
-	}
 	return
 }
 

@@ -68,9 +68,8 @@ func (ib *Infobase) GetCredentials() (string, string, error) {
 }
 
 type ConnectionString struct {
-	Database string `yaml:"database"`
-	Path     string `yaml:"path,omitempty"`
-	Server   string `yaml:"server,omitempty"`
+	Path   string `yaml:"path,omitempty"`
+	Server string `yaml:"server,omitempty"`
 }
 
 func (cs *ConnectionString) Get() (string, string, error) {

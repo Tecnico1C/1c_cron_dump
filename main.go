@@ -102,16 +102,6 @@ func main() {
 
 func DumpMode(config *models.Config) {
 
-	connectionMap := make(map[string]*models.ConnectionString)
-
-	for i := 0; i < len(config.ConnectionStrings); i++ {
-		_, ok := connectionMap[config.ConnectionStrings[i].Database]
-		if ok {
-			log.Fatalf("Duplicate connection string for <%s>", config.ConnectionStrings[i].Database)
-		}
-		connectionMap[config.ConnectionStrings[i].Database] = &config.ConnectionStrings[i]
-	}
-
 	logs := make(chan map[string]string)
 	uploadJobs := make(chan models.DriveObject)
 	concurrentJobs := make(chan struct{}, config.DumpConcurrencyLevel)
@@ -128,9 +118,9 @@ func DumpMode(config *models.Config) {
 	wgLogger.Add(1)
 	go dump_thread.LeggerThread(logs, logPath, &wgLogger)
 
-	for i := 0; i < len(config.Databases); i++ {
+	for i := 0; i < len(config.Infobases); i++ {
 		wgWorker.Add(1)
-		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Databases[i], connectionMap[config.Databases[i].Name], logs, uploadJobs, &wgWorker, concurrentJobs)
+		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Infobases[i], logs, uploadJobs, &wgWorker, concurrentJobs)
 	}
 
 	for i := 0; i < config.UploadConcurrencyLevel; i++ {
@@ -149,7 +139,7 @@ func DumpMode(config *models.Config) {
 func ClearMode(config *models.Config) {
 	databaseMap := make(map[string]*models.Infobase)
 	for i := 0; i < len(config.Databases); i++ {
-		databaseMap[config.Databases[i].Name] = &config.Databases[i]
+		databaseMap[config.Databases[i].Name] = &config.Infobases[i]
 	}
 
 	regexpDumpFile := regexp.MustCompile(`^Dump_(?P<infobase_name>[a-zA-Z0-9_]+)_(?P<creation_date>[0-9]{8})_[0-9]{13}_[a-f0-9]{8}.dt$`)

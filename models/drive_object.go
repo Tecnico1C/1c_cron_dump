@@ -1,7 +1,7 @@
 package models
 
 type DriveObject struct {
-	Infobase     *Infobase
+	Infobase     DataWarehouse
 	FullFilePath string
 	FileName     string
 }

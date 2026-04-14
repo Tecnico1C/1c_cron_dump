@@ -1,7 +1,6 @@
 package dump_thread
 
 import (
-	"1c_cron_dump/models"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,16 +13,16 @@ type Log struct {
 	Data      map[string]string `json:"data"`
 }
 
-func LogInfo(infobase *models.Infobase, text string) map[string]string {
+func LogInfo(name string, text string) map[string]string {
 	log := make(map[string]string)
-	log["infobase"] = infobase.Name
+	log["infobase"] = name
 	log["text"] = text
 	return log
 }
 
-func LogError(infobase *models.Infobase, text string, err error) map[string]string {
+func LogError(name string, text string, err error) map[string]string {
 	log := make(map[string]string)
-	log["infobase"] = infobase.Name
+	log["infobase"] = name
 	log["text"] = text
 	log["error"] = err.Error()
 	return log

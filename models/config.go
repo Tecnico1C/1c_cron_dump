@@ -1,12 +1,151 @@
 package models
 
+import (
+	"1c_cron_dump/utils"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"time"
+
+	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/option"
+)
+
 type Config struct {
 	AvailableBinaries      map[string]string  `yaml:"available_binaries"`
-	Databases              []Infobase         `yaml:"databases"`
+	Infobases              []Infobase         `yaml:"infobases"`
+	Databases              []Database         `yaml:"databases"`
 	LogFolder              string             `yaml:"log_folder"`
 	DumpFolder             string             `yaml:"dump_folder"`
 	DumpConcurrencyLevel   int                `yaml:"dump_concurrency_level"`
 	UploadConcurrencyLevel int                `yaml:"upload_concurrency_level"`
 	MaxAttempts            int                `yaml:"max_attempts"`
 	ConnectionStrings      []ConnectionString `yaml:"connection_strings"`
+}
+
+func (ib *Infobase) GenerateFileName() (string, error) {
+	ts := time.Now().UTC().UnixMilli()
+	id, err := utils.RandomHex(4)
+	if err != nil {
+		return "", err
+	}
+
+	fileName := fmt.Sprintf("Dump_%s_%s_%013d_%s.dt", ib.Name, time.Now().Format("20060102"), ts, id)
+
+	return fileName, nil
+}
+
+func (db *Database) GenerateFileName() (string, error) {
+	ts := time.Now().UTC().UnixMilli()
+	id, err := utils.RandomHex(4)
+	if err != nil {
+		return "", err
+	}
+
+	fileName := fmt.Sprintf("Dump_%s_%s_%013d_%s.dt", db.Name, time.Now().Format("20060102"), ts, id)
+
+	return fileName, nil
+}
+
+func (ib *Infobase) GetConnectionString() (string, string, error) {
+	if ib.ConnectionString.Path != "" {
+		return "/F", ib.ConnectionString.Path, nil
+	}
+	if ib.ConnectionString.Server != "" {
+		return "/S", ib.ConnectionString.Server, nil
+	}
+	return "", "", errors.New("Missing <path> or <server> ?")
+}
+
+func (ib *Infobase) GetBinary() string {
+	return ib.Binary
+}
+
+func (db *Database) GetBinary() string {
+	return db.Binary
+}
+
+func (ib *Infobase) GetName() string {
+	return ib.Name
+}
+
+func (db *Database) GetName() string {
+	return db.Name
+}
+
+func (ib *Infobase) GetCron() string {
+	return ib.Cron
+}
+
+func (db *Database) GetCron() string {
+	return db.Cron
+}
+
+type DataWarehouse interface {
+	GenerateFileName() (string, error)
+	CommandArgs(string) ([]string, error)
+	GetCredentials() (string, string, error)
+	GetBinary() string
+	GetName() string
+	UploadToDrive(string, string) error
+	GetCron() string
+}
+
+func (ib *Infobase) UploadToDrive(dumpFileName string, dumpFilePath string) error {
+	ctx := context.Background()
+	srv, err := drive.NewService(ctx,
+		option.WithAuthCredentialsFile(option.ServiceAccount, ib.ServiceAccountFilePath),
+		option.WithScopes(drive.DriveScope),
+	)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(dumpFilePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	driveFile := &drive.File{
+		Name:    dumpFileName,
+		Parents: []string{ib.DriveFolderId},
+	}
+
+	_, err = srv.Files.Create(driveFile).Media(f).SupportsAllDrives(true).Do()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *Database) UploadToDrive(dumpFileName string, dumpFilePath string) error {
+	ctx := context.Background()
+	srv, err := drive.NewService(ctx,
+		option.WithAuthCredentialsFile(option.ServiceAccount, db.ServiceAccountFilePath),
+		option.WithScopes(drive.DriveScope),
+	)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(dumpFilePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	driveFile := &drive.File{
+		Name:    dumpFileName,
+		Parents: []string{db.DriveFolderId},
+	}
+
+	_, err = srv.Files.Create(driveFile).Media(f).SupportsAllDrives(true).Do()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

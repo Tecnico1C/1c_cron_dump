@@ -2,7 +2,6 @@ package dump_thread
 
 import (
 	"1c_cron_dump/models"
-	"1c_cron_dump/utils"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -20,10 +19,10 @@ type DueTime struct {
 	errorIsFatal bool
 }
 
-func CalculateDueTime(logs chan<- map[string]string, infobase *models.Infobase) DueTime {
-	isDue, err := gronx.New().IsDue(infobase.Cron, time.Now().Truncate(time.Minute))
+func CalculateDueTime(logs chan<- map[string]string, ibName string, cron string) DueTime {
+	isDue, err := gronx.New().IsDue(cron, time.Now().Truncate(time.Minute))
 	if err != nil {
-		logs <- LogError(infobase, "Unable to calculate time schedule", err)
+		logs <- LogError(ibName, "Unable to calculate time schedule", err)
 		return DueTime{
 			isNow:        false,
 			nextTick:     time.Time{},
@@ -32,9 +31,9 @@ func CalculateDueTime(logs chan<- map[string]string, infobase *models.Infobase) 
 		}
 	}
 	if !isDue {
-		nextTick, err := gronx.NextTick(infobase.Cron, true)
+		nextTick, err := gronx.NextTick(cron, true)
 		if err != nil {
-			logs <- LogError(infobase, "Unable to calculate next tick", err)
+			logs <- LogError(ibName, "Unable to calculate next tick", err)
 			return DueTime{
 				isNow:        false,
 				nextTick:     time.Time{},
@@ -43,7 +42,7 @@ func CalculateDueTime(logs chan<- map[string]string, infobase *models.Infobase) 
 			}
 		}
 
-		logs <- LogInfo(infobase, fmt.Sprintf("not allowed to perform a dump at this time, will retry at: %s", nextTick.UTC().Format(time.RFC3339)))
+		logs <- LogInfo(ibName, fmt.Sprintf("not allowed to perform a dump at this time, will retry at: %s", nextTick.UTC().Format(time.RFC3339)))
 		return DueTime{
 			isNow:        false,
 			nextTick:     nextTick,
@@ -65,10 +64,11 @@ type JobStatus struct {
 	errIsFatal  bool
 }
 
-func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.Infobase, connectionString *models.ConnectionString, logs chan<- map[string]string, wg *sync.WaitGroup) JobStatus {
-	username, password, err := infobase.GetCredentials()
+func RunJob(dumpFilePath string, binaries map[string]string, infobase models.DataWarehouse, logs chan<- map[string]string, wg *sync.WaitGroup) JobStatus {
+	commandArgs, err := infobase.CommandArgs(dumpFilePath)
+
 	if err != nil {
-		logs <- LogError(infobase, "Unable to load infobase credentials", err)
+		logs <- LogError(infobase.GetName(), "Error thrown while creating terminal command", err)
 		return JobStatus{
 			isCompleted: false,
 			err:         err,
@@ -76,28 +76,9 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.In
 		}
 	}
 
-	flag, path, err := connectionString.Get()
-	if err != nil {
-		logs <- LogError(infobase, "Unable to load connection string data", err)
-		return JobStatus{
-			isCompleted: false,
-			err:         err,
-			errIsFatal:  true,
-		}
-	}
-
-	cmdArgs := []string{
-		"DESIGNER",
-		flag, path,
-		"/N", username,
-		"/P", password,
-		"/DumpIB", dumpFilePath,
-		"/DisableStartupDialogs",
-	}
-
-	binary, ok := binaries[infobase.Binary]
+	binary, ok := binaries[infobase.GetBinary()]
 	if !ok {
-		logs <- LogError(infobase, "Unable to find binary file", errors.New("File binary not found in config file"))
+		logs <- LogError(infobase.GetName(), "Unable to find binary file", errors.New("File binary not found in config file"))
 		return JobStatus{
 			isCompleted: false,
 			err:         errors.New("File binary not found in config file"),
@@ -105,9 +86,9 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.In
 		}
 	}
 
-	_, err = exec.Command(binary, cmdArgs...).Output()
+	_, err = exec.Command(binary, commandArgs...).Output()
 	if err != nil {
-		logs <- LogError(infobase, "Runtime error", err)
+		logs <- LogError(infobase.GetName(), "Runtime error", err)
 		return JobStatus{
 			isCompleted: false,
 			err:         err,
@@ -121,23 +102,22 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase *models.In
 	}
 }
 
-func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, infobase *models.Infobase, connectionString *models.ConnectionString, logs chan<- map[string]string, uploadJobs chan<- models.DriveObject, wg *sync.WaitGroup, concurrentJobs chan struct{}) {
+func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, infobase models.DataWarehouse, logs chan<- map[string]string, uploadJobs chan<- models.DriveObject, wg *sync.WaitGroup, concurrentJobs chan struct{}) {
 	defer wg.Done()
 	retry := 0
 	limit := maxAttempts
 
-	ts := time.Now().UTC().UnixMilli()
-	id, err := utils.RandomHex(4)
+	fileName, err := infobase.GenerateFileName()
+
 	if err != nil {
-		logs <- LogError(infobase, "Unable to generate random id", err)
+		logs <- LogError(infobase.GetName(), "Unable to generate random id", err)
 		return
 	}
 
-	fileName := fmt.Sprintf("Dump_%s_%s_%013d_%s.dt", infobase.Name, time.Now().Format("20060102"), ts, id)
 	filePath := path.Join(dumpFolder, fileName)
 
 	for {
-		dueTime := CalculateDueTime(logs, infobase)
+		dueTime := CalculateDueTime(logs, infobase.GetName(), infobase.GetCron())
 		if dueTime.err != nil {
 			if dueTime.errorIsFatal {
 				return
@@ -155,7 +135,7 @@ func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, info
 
 		// Enter critical region
 		concurrentJobs <- struct{}{}
-		jobStatus := RunJob(filePath, binaries, infobase, connectionString, logs, wg)
+		jobStatus := RunJob(filePath, binaries, infobase, logs, wg)
 		<-concurrentJobs
 		// Exit critical region
 
@@ -169,16 +149,16 @@ func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, info
 
 		if retry < limit {
 			retry += 1
-			logs <- LogError(infobase, "There was an error, retry...", fmt.Errorf("There was an error: <%v> retry in 60 seconds", jobStatus.err))
+			logs <- LogError(infobase.GetName(), "There was an error, retry...", fmt.Errorf("There was an error: <%v> retry in 60 seconds", jobStatus.err))
 			time.Sleep(60 * time.Second)
 			continue
 		} else {
-			logs <- LogError(infobase, "Reached maximum number of retry", jobStatus.err)
+			logs <- LogError(infobase.GetName(), "Reached maximum number of retry", jobStatus.err)
 			return
 		}
 	}
 
-	logs <- LogInfo(infobase, "Dump completed successfully")
+	logs <- LogInfo(infobase.GetName(), "Dump completed successfully")
 
 	uploadJobs <- models.DriveObject{
 		Infobase:     infobase,

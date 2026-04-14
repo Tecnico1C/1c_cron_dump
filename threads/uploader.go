@@ -9,17 +9,11 @@ func DriveUploaderWorker(jobs <-chan models.DriveObject, logs chan<- map[string]
 	defer wg.Done()
 
 	for obj := range jobs {
-		for {
-			err := obj.Infobase.UploadToDrive(obj.FileName, obj.FullFilePath)
-			if err == nil {
-				logs <- LogInfo(obj.Infobase.GetName(), "Dump successfully uploaded to Drive")
-				break
-			}
-
-			if err != nil {
-				logs <- LogError(obj.Infobase.GetName(), "There was an error uploading dump to Drive", err)
-				break
-			}
+		err := obj.Infobase.UploadToDrive(obj.FileName, obj.FullFilePath)
+		if err == nil {
+			logs <- LogInfo(obj.Infobase.GetName(), "Dump successfully uploaded to Drive")
+		} else {
+			logs <- LogError(obj.Infobase.GetName(), "There was an error uploading dump to Drive", err)
 		}
 	}
 

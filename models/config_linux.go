@@ -48,29 +48,6 @@ func (ib *Infobase) GetDriveFolderId() string {
 	return ib.DriveFolderId
 }
 
-func (ib *Infobase) CommandArgs(dumpFullPath string) ([]string, error) {
-	username, password, err := GetCredentials(ib.LinuxCredentials)
-
-	if err != nil {
-		return []string{}, err
-	}
-
-	flag, path, err := ib.GetConnectionString()
-
-	if err != nil {
-		return []string{}, err
-	}
-
-	return []string{
-		"DESIGNER",
-		flag, path,
-		"/N", username,
-		"/P", password,
-		"/DumpIB", dumpFullPath,
-		"/DisableStartupDialogs",
-	}, nil
-}
-
 func (ib *Infobase) GetCredentials() (string, string, error) {
 	return GetCredentials(ib.LinuxCredentials)
 }
@@ -102,23 +79,10 @@ type Database struct {
 	TTLDays                int    `yaml:"ttl_days"`
 }
 
-func (db *Database) GetDriveFolderId() string {
-	return db.DriveFolderId
+func (db *Database) GetCredentials() (string, string, error) {
+	return GetCredentials(db.LinuxCredentials)
 }
 
-func (db *Database) CommandArgs(dumpFullPath string) ([]string, error) {
-	username, password, err := GetCredentials(db.LinuxCredentials)
-
-	if err != nil {
-		return []string{}, err
-	}
-
-	return []string{
-		"-F", "c",
-		"-d", db.Name,
-		"-f", dumpFullPath,
-		"-z", "6",
-		"-U", username,
-		"-P", password,
-	}, nil
+func (db *Database) GetDriveFolderId() string {
+	return db.DriveFolderId
 }

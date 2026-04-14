@@ -4,7 +4,6 @@ import (
 	"1c_cron_dump/models"
 	"errors"
 	"fmt"
-	"os/exec"
 	"path"
 	"sync"
 	"time"
@@ -65,16 +64,6 @@ type JobStatus struct {
 }
 
 func RunJob(dumpFilePath string, binaries map[string]string, infobase models.DataWarehouse, logs chan<- map[string]string, wg *sync.WaitGroup) JobStatus {
-	commandArgs, err := infobase.CommandArgs(dumpFilePath)
-
-	if err != nil {
-		logs <- LogError(infobase.GetName(), "Error thrown while creating terminal command", err)
-		return JobStatus{
-			isCompleted: false,
-			err:         err,
-			errIsFatal:  true,
-		}
-	}
 
 	binary, ok := binaries[infobase.GetBinary()]
 	if !ok {
@@ -86,7 +75,9 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase models.Dat
 		}
 	}
 
-	_, err = exec.Command(binary, commandArgs...).Output()
+	cmd, err := infobase.GetCommand(binary, dumpFilePath)
+
+	_, err = cmd.Output()
 	if err != nil {
 		logs <- LogError(infobase.GetName(), "Runtime error", err)
 		return JobStatus{

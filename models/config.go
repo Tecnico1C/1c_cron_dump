@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"time"
 
 	"google.golang.org/api/drive/v3"
@@ -84,7 +85,7 @@ func (db *Database) GetCron() string {
 
 type DataWarehouse interface {
 	GenerateFileName() (string, error)
-	CommandArgs(string) ([]string, error)
+	GetCommand(string, string) (*exec.Cmd, error)
 	GetCredentials() (string, string, error)
 	GetBinary() string
 	GetName() string
@@ -148,4 +149,54 @@ func (db *Database) UploadToDrive(dumpFileName string, dumpFilePath string) erro
 	}
 
 	return nil
+}
+
+func (db *Database) GetCommand(binary string, dumpFullPath string) (*exec.Cmd, error) {
+	username, password, err := db.GetCredentials()
+
+	if err != nil {
+		return nil, err
+	}
+
+	args := []string{
+		"-F", "c",
+		"-d", db.Name,
+		"-f", dumpFullPath,
+		"-z", "6",
+		"-U", username,
+	}
+
+	cmd := exec.Command(binary, args...)
+	cmd.Env = append(cmd.Env,
+		fmt.Sprintf("PGPASSWORD=%s", password),
+	)
+
+	return cmd, nil
+}
+
+func (ib *Infobase) GetCommand(binary string, dumpFullPath string) (*exec.Cmd, error) {
+	username, password, err := ib.GetCredentials()
+
+	if err != nil {
+		return nil, err
+	}
+
+	flag, path, err := ib.GetConnectionString()
+
+	if err != nil {
+		return nil, err
+	}
+
+	args := []string{
+		"DESIGNER",
+		flag, path,
+		"/N", username,
+		"/P", password,
+		"/DumpIB", dumpFullPath,
+		"/DisableStartupDialogs",
+	}
+
+	cmd := exec.Command(binary, args...)
+
+	return cmd, nil
 }

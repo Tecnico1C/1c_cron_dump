@@ -43,7 +43,7 @@ func (db *Database) GenerateFileName() (string, error) {
 		return "", err
 	}
 
-	fileName := fmt.Sprintf("Dump_%s_%s_%013d_%s.dt", db.Name, time.Now().Format("20060102"), ts, id)
+	fileName := fmt.Sprintf("PGSQL_%s_%s_%013d_%s.dump", db.Name, time.Now().Format("20060102"), ts, id)
 
 	return fileName, nil
 }

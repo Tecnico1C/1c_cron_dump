@@ -161,10 +161,10 @@ func (db *Database) GetCommand(binary string, dumpFullPath string) (*exec.Cmd, e
 		"-F", "c",
 		"-p", db.Port,
 		"-h", db.Host,
-		"-d", db.Name,
 		"-f", dumpFullPath,
 		"-z", "6",
 		"-U", username,
+		db.Name,
 	}
 
 	cmd := exec.Command(binary, args...)

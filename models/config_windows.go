@@ -27,7 +27,6 @@ func GetCredentials(name string) (string, string, error) {
 type Infobase struct {
 	Name                   string           `yaml:"name"`
 	Cron                   string           `yaml:"cron"`
-	DumpPath               string           `yaml:"dump_path"`
 	WindowsCredentials     string           `yaml:"windows_credentials"`
 	Binary                 string           `yaml:"binary"`
 	DriveFolderId          string           `yaml:"drive_folder_id"`
@@ -62,7 +61,6 @@ func (cs *ConnectionString) Get() (string, string, error) {
 type Database struct {
 	Name                   string `yaml:"name"`
 	Cron                   string `yaml:"cron"`
-	DumpPath               string `yaml:"dump_path"`
 	WindowsCredentials     string `yaml:"windows_credentials"`
 	Binary                 string `yaml:"binary"`
 	DriveFolderId          string `yaml:"drive_folder_id"`

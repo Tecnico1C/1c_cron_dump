@@ -22,7 +22,6 @@ type Config struct {
 	DumpConcurrencyLevel   int                `yaml:"dump_concurrency_level"`
 	UploadConcurrencyLevel int                `yaml:"upload_concurrency_level"`
 	MaxAttempts            int                `yaml:"max_attempts"`
-	ConnectionStrings      []ConnectionString `yaml:"connection_strings"`
 }
 
 func (ib *Infobase) GenerateFileName() (string, error) {

@@ -93,7 +93,7 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase models.Dat
 	}
 }
 
-func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, infobase models.DataWarehouse, logs chan<- map[string]string, uploadJobs chan<- models.DriveObject, wg *sync.WaitGroup, concurrentJobs chan struct{}) {
+func Worker(dayLimit time.Time, maxAttempts int, dumpFolder string, binaries map[string]string, infobase models.DataWarehouse, logs chan<- map[string]string, uploadJobs chan<- models.DriveObject, wg *sync.WaitGroup, concurrentJobs chan struct{}) {
 	defer wg.Done()
 	retry := 0
 	limit := maxAttempts
@@ -115,6 +115,11 @@ func Worker(maxAttempts int, dumpFolder string, binaries map[string]string, info
 			} else {
 				continue
 			}
+		}
+
+		if !dueTime.isNow && dueTime.nextTick.After(dayLimit) {
+			logs <- LogInfo(infobase.GetName(), "No more time window for today")
+			return
 		}
 
 		if !dueTime.isNow {

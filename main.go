@@ -86,6 +86,11 @@ func main() {
 
 func DumpMode(config *models.Config) {
 
+	today := time.Now()
+	dateLimit := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.Local)
+	dateLimit = dateLimit.Add(24 * time.Hour)
+	dateLimit = dateLimit.Add(-1 * time.Nanosecond)
+
 	logs := make(chan map[string]string)
 	uploadJobs := make(chan models.DriveObject)
 	concurrentJobs := make(chan struct{}, config.DumpConcurrencyLevel)
@@ -104,7 +109,12 @@ func DumpMode(config *models.Config) {
 
 	for i := 0; i < len(config.Infobases); i++ {
 		wgWorker.Add(1)
-		go dump_thread.Worker(config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Infobases[i], logs, uploadJobs, &wgWorker, concurrentJobs)
+		go dump_thread.Worker(dateLimit, config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Infobases[i], logs, uploadJobs, &wgWorker, concurrentJobs)
+	}
+
+	for i := 0; i < len(config.Databases); i++ {
+		wgWorker.Add(1)
+		go dump_thread.Worker(dateLimit, config.MaxAttempts, config.DumpFolder, config.AvailableBinaries, &config.Databases[i], logs, uploadJobs, &wgWorker, concurrentJobs)
 	}
 
 	for i := 0; i < config.UploadConcurrencyLevel; i++ {

@@ -14,14 +14,14 @@ import (
 )
 
 type Config struct {
-	AvailableBinaries      map[string]string  `yaml:"available_binaries"`
-	Infobases              []Infobase         `yaml:"infobases"`
-	Databases              []Database         `yaml:"databases"`
-	LogFolder              string             `yaml:"log_folder"`
-	DumpFolder             string             `yaml:"dump_folder"`
-	DumpConcurrencyLevel   int                `yaml:"dump_concurrency_level"`
-	UploadConcurrencyLevel int                `yaml:"upload_concurrency_level"`
-	MaxAttempts            int                `yaml:"max_attempts"`
+	AvailableBinaries      map[string]string `yaml:"available_binaries"`
+	Infobases              []Infobase        `yaml:"infobases"`
+	Databases              []Database        `yaml:"databases"`
+	LogFolder              string            `yaml:"log_folder"`
+	DumpFolder             string            `yaml:"dump_folder"`
+	DumpConcurrencyLevel   int               `yaml:"dump_concurrency_level"`
+	UploadConcurrencyLevel int               `yaml:"upload_concurrency_level"`
+	MaxAttempts            int               `yaml:"max_attempts"`
 }
 
 func (ib *Infobase) GenerateFileName() (string, error) {
@@ -159,6 +159,8 @@ func (db *Database) GetCommand(binary string, dumpFullPath string) (*exec.Cmd, e
 
 	args := []string{
 		"-F", "c",
+		"-p", db.Port,
+		"-h", db.Host,
 		"-d", db.Name,
 		"-f", dumpFullPath,
 		"-z", "6",

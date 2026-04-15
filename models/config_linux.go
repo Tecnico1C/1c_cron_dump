@@ -77,6 +77,8 @@ type Database struct {
 	DriveFolderId          string `yaml:"drive_folder_id"`
 	ServiceAccountFilePath string `yaml:"service_account_file_path"`
 	TTLDays                int    `yaml:"ttl_days"`
+	Host                   string `yaml:"host"`
+	Port                   string `yaml:"port"`
 }
 
 func (db *Database) GetCredentials() (string, string, error) {

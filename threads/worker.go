@@ -77,6 +77,15 @@ func RunJob(dumpFilePath string, binaries map[string]string, infobase models.Dat
 
 	cmd, err := infobase.GetCommand(binary, dumpFilePath)
 
+	if err != nil {
+		logs <- LogError(infobase.GetName(), "Config parse error", err)
+		return JobStatus{
+			isCompleted: false,
+			err:         err,
+			errIsFatal:  true,
+		}
+	}
+
 	_, err = cmd.Output()
 	if err != nil {
 		logs <- LogError(infobase.GetName(), "Runtime error", err)

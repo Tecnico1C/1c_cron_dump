@@ -162,7 +162,7 @@ func (db *Database) GetCommand(binary string, dumpFullPath string) (*exec.Cmd, e
 		"-p", db.Port,
 		"-h", db.Host,
 		"-f", dumpFullPath,
-		"-z", "6",
+		"-Z", "6",
 		"-U", username,
 		db.Name,
 	}
